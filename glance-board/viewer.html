@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glance-Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked@13/marked.min.js"></script>
+<style>
+  :root{
+    --green:#10b981; --green-dark:#047857; --green-soft:#d1fae5;
+    --teal-deep:#0c2926; --teal:#134e4a; --teal-mid:#115e59;
+    --purple:#7c3aed; --orange:#ea580c; --pink:#db2777; --blue:#2563eb;
+    --canvas:#ffffff; --canvas-dark:#0c2926; --surface:#f8faf9; --surface-soft:#f1f5f4;
+    --hairline:#e3e8e6; --hairline-soft:#eef2f1; --hairline-dark:#1e3a36;
+    --ink:#0c2926; --slate:#3f5a55; --steel:#5f7a74; --stone:#8aa39d; --muted:#aab9b5;
+    --on-dark:#ffffff; --on-dark-muted:#9db8b2;
+    --r-sm:6px; --r-md:8px; --r-lg:12px; --r-full:9999px;
+    --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --mono:"Source Code Pro","SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--font);color:var(--ink);background:var(--surface);display:flex;overflow:hidden;-webkit-font-smoothing:antialiased}
+
+  /* ---------- sidebar (stable shell) ---------- */
+  aside{width:300px;flex:none;background:var(--teal-deep);color:var(--on-dark);height:100vh;overflow-y:auto;border-right:1px solid var(--hairline-dark);display:flex;flex-direction:column}
+  .brand{padding:22px 20px 16px;border-bottom:1px solid var(--hairline-dark)}
+  .brand .eye{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--green)}
+  .brand .run{font-size:18px;font-weight:500;letter-spacing:-.01em;margin-top:5px;color:var(--on-dark)}
+  .brand .meta{font-size:12px;color:var(--on-dark-muted);margin-top:6px;display:flex;align-items:center;gap:7px}
+  .live{display:inline-flex;align-items:center;gap:5px}
+  .live .d{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(16,185,129,.5);animation:pulse 2s infinite}
+  .live.off .d{background:var(--stone);animation:none}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}70%{box-shadow:0 0 0 6px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+
+  .group{padding:14px 12px 2px}
+  .group h4{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--on-dark-muted);padding:0 8px 7px}
+  .pitem{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:var(--r-md);cursor:pointer;margin-bottom:2px;border-left:3px solid transparent;transition:background .12s}
+  .pitem:hover{background:rgba(255,255,255,.05)}
+  .pitem.active{background:rgba(16,185,129,.10);border-left-color:var(--green)}
+  .pitem .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .dot.idle{background:var(--stone)} .dot.done{background:var(--green)}
+  .dot.running{background:var(--green);box-shadow:0 0 0 0 rgba(16,185,129,.6);animation:pulse 1.6s infinite}
+  .dot.blocked{background:var(--orange)} .dot.error{background:var(--pink)}
+  .pitem .pt{flex:1;min-width:0}
+  .pitem .pt .nm{font-size:13.5px;font-weight:500;color:var(--on-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pitem .pt .ty{font-size:11px;color:var(--on-dark-muted);text-transform:capitalize}
+
+  /* ---------- main ---------- */
+  main{flex:1;height:100vh;overflow-y:auto;background:var(--surface)}
+  .mhead{position:sticky;top:0;background:rgba(249,251,250,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--hairline);padding:22px 32px;z-index:5}
+  .mhead .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .mhead h1{font-size:24px;font-weight:500;letter-spacing:-.02em}
+  .sbadge{font-size:12px;font-weight:600;padding:3px 11px;border-radius:var(--r-full);text-transform:capitalize}
+  .sbadge.idle{background:var(--hairline);color:var(--steel)}
+  .sbadge.running{background:var(--green-soft);color:var(--green-dark)}
+  .sbadge.done{background:var(--green);color:var(--teal-deep)}
+  .sbadge.blocked{background:#ffe6d6;color:#a14a22}
+  .sbadge.error{background:#ffd9ea;color:#a01a5a}
+  .mhead .sum{color:var(--slate);font-size:15px;margin-top:8px}
+  .mhead .row{display:flex;gap:14px;align-items:center;margin-top:10px;font-size:12px;color:var(--steel)}
+  .tag{background:var(--surface-soft);border:1px solid var(--hairline);color:var(--steel);font-size:11px;padding:2px 9px;border-radius:var(--r-full)}
+
+  .blocks{padding:26px 32px 80px;max-width:980px}
+  .block{margin-bottom:22px}
+  .block .bt{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--stone);margin-bottom:8px}
+  .md{font-size:15px;line-height:1.6;color:var(--ink)}
+  .md h1,.md h2,.md h3{font-weight:600;letter-spacing:-.01em;margin:16px 0 8px} .md h2{font-size:20px} .md h3{font-size:16px}
+  .md p{margin:8px 0} .md ul,.md ol{margin:8px 0 8px 22px} .md li{margin:4px 0}
+  .md code{font-family:var(--mono);font-size:13px;background:var(--surface-soft);padding:1px 6px;border-radius:4px;color:var(--green-dark)}
+  .md pre{background:var(--canvas-dark);color:var(--on-dark);padding:14px 16px;border-radius:var(--r-md);overflow:auto;margin:10px 0}
+  .md pre code{background:none;color:var(--on-dark);padding:0}
+  .card{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-lg);overflow:hidden}
+  pre.code{background:var(--canvas-dark);color:var(--on-dark);font-family:var(--mono);font-size:13.5px;padding:16px 18px;border-radius:var(--r-md);overflow:auto}
+  pre.code .ct{color:var(--green);font-size:11px;letter-spacing:.5px;text-transform:uppercase;display:block;margin-bottom:8px;opacity:.8}
+  pre.diff{font-family:var(--mono);font-size:13px;border-radius:var(--r-md);overflow:auto;border:1px solid var(--hairline);background:var(--canvas)}
+  pre.diff .ln{padding:2px 14px;white-space:pre}
+  pre.diff .add{background:#d1fae5;color:#047857} pre.diff .del{background:#ffe9ef;color:#a01a5a} pre.diff .hdr{background:var(--surface-soft);color:var(--steel)}
+  table.tbl{width:100%;border-collapse:collapse;background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-md);font-size:13.5px;overflow:hidden}
+  table.tbl th,table.tbl td{padding:10px 14px;border-bottom:1px solid var(--hairline-soft);text-align:left}
+  table.tbl th{background:var(--surface-soft);font-weight:600;color:var(--steel);font-size:12px}
+  .kv{display:grid;grid-template-columns:max-content 1fr;gap:8px 22px;background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-md);padding:16px 18px}
+  .kv dt{font-size:12px;color:var(--steel);font-weight:500} .kv dd{font-size:14px;color:var(--ink);font-family:var(--mono)}
+  .callout{border-radius:var(--r-md);padding:14px 16px;border-left:3px solid;font-size:14px}
+  .callout.info{background:#eef4ff;border-color:var(--blue)} .callout.good{background:#d1fae5;border-color:var(--green-dark)}
+  .callout.warn{background:#fff4e8;border-color:var(--orange)} .callout.bad{background:#ffe9ef;border-color:var(--pink)}
+  a.lk{display:inline-block;color:var(--green-dark);font-weight:500;font-size:14px;border:1px solid var(--hairline-strong,#c1ccd6);border-radius:var(--r-full);padding:7px 16px}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;color:var(--stone);text-align:center;padding:40px}
+  .empty .big{font-size:22px;font-weight:500;color:var(--slate);margin-bottom:8px}
+  .empty code{font-family:var(--mono);font-size:13px;background:var(--surface-soft);padding:2px 8px;border-radius:5px;color:var(--green-dark)}
+  @media(max-width:760px){aside{width:84px}.brand .run,.brand .meta,.pitem .pt{display:none}.pitem{justify-content:center}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand">
+    <div class="eye" id="ws">WORKSPACE</div>
+    <div class="run" id="runTitle">Glance-Board</div>
+    <div class="meta"><span class="live off" id="live"><span class="d"></span><span id="liveTxt">waiting</span></span> · <span id="freshness">—</span></div>
+  </div>
+  <div id="nav"></div>
+</aside>
+<main id="main">
+  <div class="empty" id="empty">
+    <div class="big">Waiting for agents…</div>
+    <div>No <code>state/manifest.json</code> yet. As agents write JSON into<br><code>.tmp/glance-board/state/</code>, panels appear here live.</div>
+  </div>
+  <div id="view" style="display:none">
+    <div class="mhead">
+      <div class="top"><h1 id="vTitle"></h1><span class="sbadge" id="vStatus"></span><span id="vTags"></span></div>
+      <div class="sum" id="vSum"></div>
+      <div class="row"><span id="vType"></span><span id="vUpd"></span></div>
+    </div>
+    <div class="blocks" id="vBlocks"></div>
+  </div>
+</main>
+
+<script>
+const TYPE_ORDER = ["status","orchestrator","agent","spec","output","context"];
+const TYPE_LABEL = {status:"Status",orchestrator:"Orchestrator",agent:"Agents",spec:"Specs",output:"Outputs",context:"Context"};
+let selected = null;       // selected panel id (preserved across polls)
+let lastUpdated = null;
+
+function timeAgo(iso){
+  if(!iso) return "—";
+  const t = new Date(iso).getTime(); if(isNaN(t)) return iso;
+  const s = Math.max(0,Math.round((Date.now()-t)/1000));
+  if(s<60) return s+"s ago"; if(s<3600) return Math.round(s/60)+"m ago"; return Math.round(s/3600)+"h ago";
+}
+function esc(x){return (x??"").toString().replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+async function getJSON(path){
+  try{ const r = await fetch(path+"?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return await r.json(); }
+  catch(e){ return null; }
+}
+
+async function poll(){
+  const manifest = await getJSON("state/manifest.json");
+  const live = document.getElementById("live"), liveTxt = document.getElementById("liveTxt");
+  if(!manifest || !Array.isArray(manifest.panels) || !manifest.panels.length){
+    live.classList.add("off"); liveTxt.textContent="waiting";
+    document.getElementById("empty").style.display="flex";
+    document.getElementById("view").style.display="none";
+    return;
+  }
+  live.classList.remove("off"); liveTxt.textContent="live";
+  document.getElementById("ws").textContent = (manifest.workspace||"workspace").toUpperCase();
+  document.getElementById("runTitle").textContent = manifest.title||"Glance-Board";
+  document.getElementById("freshness").textContent = "updated "+timeAgo(manifest.updated);
+
+  // fetch all panels
+  const panels = (await Promise.all(manifest.panels.map(async p=>{
+    const data = await getJSON("state/"+p.file); if(!data) return null;
+    return {...data, id:data.id||p.id};
+  }))).filter(Boolean);
+  if(!panels.length) return;
+
+  // keep selection
+  if(!selected || !panels.find(p=>p.id===selected)) selected = panels[0].id;
+  renderNav(panels); renderView(panels.find(p=>p.id===selected));
+}
+
+function renderNav(panels){
+  const nav = document.getElementById("nav");
+  const byType = {};
+  panels.forEach(p=>{ (byType[p.type] = byType[p.type]||[]).push(p); });
+  const order = [...TYPE_ORDER.filter(t=>byType[t]), ...Object.keys(byType).filter(t=>!TYPE_ORDER.includes(t))];
+  nav.innerHTML = order.map(type=>`
+    <div class="group"><h4>${TYPE_LABEL[type]||type}</h4>
+      ${byType[type].map(p=>`
+        <div class="pitem ${p.id===selected?'active':''}" data-id="${esc(p.id)}">
+          <span class="dot ${p.status||'idle'}"></span>
+          <span class="pt"><span class="nm">${esc(p.title||p.id)}</span><span class="ty">${esc(p.status||'idle')}</span></span>
+        </div>`).join("")}
+    </div>`).join("");
+  nav.querySelectorAll(".pitem").forEach(el=>el.onclick=()=>{ selected = el.dataset.id; poll(); });
+}
+
+function renderView(p){
+  if(!p) return;
+  document.getElementById("empty").style.display="none";
+  document.getElementById("view").style.display="block";
+  document.getElementById("vTitle").textContent = p.title||p.id;
+  const st = document.getElementById("vStatus"); st.textContent = p.status||"idle"; st.className = "sbadge "+(p.status||"idle");
+  document.getElementById("vTags").innerHTML = (p.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join(" ");
+  document.getElementById("vSum").textContent = p.summary||"";
+  document.getElementById("vType").textContent = (p.type||"panel");
+  document.getElementById("vUpd").textContent = "· updated "+timeAgo(p.updated);
+  document.getElementById("vBlocks").innerHTML = (p.blocks||[]).map(renderBlock).join("");
+}
+
+function renderBlock(b){
+  switch(b.type){
+    case "markdown": return `<div class="block"><div class="md">${marked.parse(b.md||"")}</div></div>`;
+    case "code": return `<div class="block">${b.title?`<div class="bt">${esc(b.title)}</div>`:""}<pre class="code">${b.lang?`<span class="ct">${esc(b.lang)}</span>`:""}${esc(b.code)}</pre></div>`;
+    case "diff": return `<div class="block">${b.title?`<div class="bt">${esc(b.title)}</div>`:""}<pre class="diff">${(b.diff||"").split("\n").map(l=>{
+        const c = l.startsWith("+")?"add":l.startsWith("-")?"del":l.startsWith("@@")?"hdr":"";
+        return `<div class="ln ${c}">${esc(l)||"&nbsp;"}</div>`;}).join("")}</pre></div>`;
+    case "table": return `<div class="block">${b.title?`<div class="bt">${esc(b.title)}</div>`:""}<table class="tbl"><thead><tr>${(b.columns||[]).map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${(b.rows||[]).map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    case "kv": return `<div class="block"><dl class="kv">${Object.entries(b.items||{}).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>`;
+    case "callout": return `<div class="block"><div class="callout ${b.tone||'info'}">${marked.parseInline(b.md||"")}</div></div>`;
+    case "list": return `<div class="block"><div class="md"><ul>${(b.items||[]).map(i=>`<li>${marked.parseInline(i)}</li>`).join("")}</ul></div></div>`;
+    case "link": return `<div class="block"><a class="lk" href="${esc(b.href)}" target="_blank" rel="noopener">${esc(b.label||b.href)} →</a></div>`;
+    default: return "";
+  }
+}
+
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>
