@@ -12,7 +12,9 @@ Glance is a pair of [Claude Code](https://docs.claude.com/claude-code) skills. W
 
 ## Install
 
-Copy both skill folders into your Claude Code skills directory:
+**Not technical?** Open [INSTALL.md](INSTALL.md), copy the prompt, and paste it into your AI agent (Claude Code, Codex, Cursor). It fetches this repo and sets everything up for you.
+
+To do it by hand, copy both skill folders into your Claude Code skills directory:
 
 ```bash
 cp -r glance-view glance-board ~/.claude/skills/
